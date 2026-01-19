@@ -924,22 +924,33 @@ def get_available_cameras():
         camera_names = []
 
         if platform.system() == "Darwin":  # macOS specific handling
-            # Try to open the default FaceTime camera first
-            cap = cv2.VideoCapture(0)
-            if cap.isOpened():
+            # Avoid opening the FaceTime camera at startup (turns on LED / sensor).
+            # Use a non-invasive system query to detect camera presence and defer
+            # opening the device until the user presses the Live button.
+            try:
+                import subprocess, json
+
+                sp = subprocess.run(
+                    ["system_profiler", "SPCameraDataType", "-json"],
+                    capture_output=True,
+                    text=True,
+                    timeout=1,
+                )
+                if sp.returncode == 0 and sp.stdout:
+                    info = json.loads(sp.stdout)
+                    cam_info = info.get("SPCameraDataType", [])
+                    if cam_info:
+                        # Map detected cameras to indices (we don't probe indices here)
+                        for idx, cam in enumerate(cam_info):
+                            camera_indices.append(idx)
+                            camera_names.append(cam.get("_name", f"Camera {idx}"))
+            except Exception:
+                # Fall back to a conservative non-opening assumption: expose the
+                # default FaceTime Camera entry (will be opened only on Live).
                 camera_indices.append(0)
                 camera_names.append("FaceTime Camera")
-                cap.release()
-
-            # On macOS, additional cameras typically use indices 1 and 2
-            for i in [1, 2]:
-                cap = cv2.VideoCapture(i)
-                if cap.isOpened():
-                    camera_indices.append(i)
-                    camera_names.append(f"Camera {i}")
-                    cap.release()
         else:
-            # Linux camera detection - test first 10 indices
+            # Linux / other Unix-like: test first 10 indices (no macOS here)
             for i in range(10):
                 cap = cv2.VideoCapture(i)
                 if cap.isOpened():
