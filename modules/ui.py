@@ -312,67 +312,45 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
     )
     show_mouth_mask_box_switch.place(relx=0.6, rely=0.55)
 
+    # Evenly spaced primary controls (Start / Destroy / Preview / Live)
+    btn_w = 0.20
+    gap = (1.0 - (btn_w * 4)) / 5.0
+    start_x = gap
+
     start_button = ctk.CTkButton(
         root,
         text=_("Start"),
         cursor="hand2",
         command=lambda: analyze_target(start, root),
     )
-    start_button.place(relx=0.15, rely=0.80, relwidth=0.2, relheight=0.05)
+    start_button.place(relx=start_x, rely=0.80, relwidth=btn_w, relheight=0.06)
 
     stop_button = ctk.CTkButton(
         root, text=_("Destroy"), cursor="hand2", command=lambda: destroy()
     )
-    stop_button.place(relx=0.4, rely=0.80, relwidth=0.2, relheight=0.05)
+    stop_button.place(
+        relx=start_x + (btn_w + gap) * 1, rely=0.80, relwidth=btn_w, relheight=0.06
+    )
 
     preview_button = ctk.CTkButton(
         root, text=_("Preview"), cursor="hand2", command=lambda: toggle_preview()
     )
-    preview_button.place(relx=0.65, rely=0.80, relwidth=0.2, relheight=0.05)
-
-    # --- Camera Selection ---
-    camera_label = ctk.CTkLabel(root, text=_("Select Camera:"))
-    camera_label.place(relx=0.1, rely=0.86, relwidth=0.2, relheight=0.05)
-
-    available_cameras = get_available_cameras()
-    camera_indices, camera_names = available_cameras
-
-    if not camera_names or camera_names[0] == "No cameras found":
-        camera_variable = ctk.StringVar(value="No cameras found")
-        camera_optionmenu = ctk.CTkOptionMenu(
-            root,
-            variable=camera_variable,
-            values=["No cameras found"],
-            state="disabled",
-        )
-    else:
-        camera_variable = ctk.StringVar(value=camera_names[0])
-        camera_optionmenu = ctk.CTkOptionMenu(
-            root, variable=camera_variable, values=camera_names
-        )
-
-    camera_optionmenu.place(relx=0.35, rely=0.86, relwidth=0.25, relheight=0.05)
+    preview_button.place(
+        relx=start_x + (btn_w + gap) * 2, rely=0.80, relwidth=btn_w, relheight=0.06
+    )
 
     live_button = ctk.CTkButton(
         root,
-        text=_("Live"),
+        text=_("Live ▾"),
         cursor="hand2",
-        command=lambda: webcam_preview(
-            root,
-            (
-                camera_indices[camera_names.index(camera_variable.get())]
-                if camera_names and camera_names[0] != "No cameras found"
-                else None
-            ),
-        ),
-        state=(
-            "normal"
-            if camera_names and camera_names[0] != "No cameras found"
-            else "disabled"
-        ),
+        command=lambda: open_camera_menu(root),
     )
-    live_button.place(relx=0.65, rely=0.86, relwidth=0.2, relheight=0.05)
-    # --- End Camera Selection ---
+    live_button.place(
+        relx=start_x + (btn_w + gap) * 3, rely=0.80, relwidth=btn_w, relheight=0.06
+    )
+    globals().setdefault("live_button", live_button)
+
+    # Camera selection is lazy (opens on Live press). This keeps the main UI clean.
 
     # --- Progress Section ---
     stage_label = ctk.CTkLabel(root, text="", justify="center")
@@ -962,6 +940,76 @@ def get_available_cameras():
             return [], ["No cameras found"]
 
         return camera_indices, camera_names
+
+
+def open_camera_menu(root: ctk.CTk) -> None:
+    """Lazy camera selector shown when the Live button is pressed.
+
+    - If zero cameras: show status message.
+    - If one camera: start preview immediately.
+    - If multiple: show a small popup with camera choices.
+    """
+    camera_indices, camera_names = get_available_cameras()
+
+    # No cameras
+    if not camera_names or camera_names[0] == "No cameras found":
+        update_status("No cameras found")
+        return
+
+    # Single camera -> start immediately
+    if len(camera_indices) == 1:
+        webcam_preview(root, camera_indices[0])
+        return
+
+    # Multiple cameras -> present a centered, scrollable chooser
+    chooser = ctk.CTkToplevel(root)
+    chooser.title(_("Select Camera"))
+    chooser.transient(root)
+    chooser.grab_set()
+
+    # Compute size and center over parent
+    max_height = 300
+    item_h = 44
+    desired_h = min(max_height, 80 + item_h * len(camera_names))
+    desired_w = 360
+    try:
+        root.update_idletasks()
+        root_x = root.winfo_rootx()
+        root_y = root.winfo_rooty()
+        root_w = root.winfo_width() or 800
+        root_h = root.winfo_height() or 600
+        x = int(root_x + (root_w - desired_w) / 2)
+        y = int(root_y + (root_h - desired_h) / 2)
+        chooser.geometry(f"{desired_w}x{desired_h}+{x}+{y}")
+    except Exception:
+        chooser.geometry(f"{desired_w}x{desired_h}")
+
+    lbl = ctk.CTkLabel(chooser, text=_("Choose camera to open:"))
+    lbl.pack(padx=12, pady=(12, 6))
+
+    list_h = desired_h - 120
+    scroll_frame = ctk.CTkScrollableFrame(chooser, width=desired_w - 24, height=list_h)
+    scroll_frame.pack(padx=12, pady=(0, 8), fill="both", expand=False)
+
+    for idx, name in zip(camera_indices, camera_names):
+
+        def _on_click(i=idx):
+            try:
+                chooser.grab_release()
+            except Exception:
+                pass
+            chooser.destroy()
+            webcam_preview(root, i)
+
+        btn = ctk.CTkButton(scroll_frame, text=name, command=_on_click)
+        btn.pack(fill="x", padx=6, pady=6)
+
+    cancel = ctk.CTkButton(
+        chooser,
+        text=_("Cancel"),
+        command=lambda: (chooser.grab_release(), chooser.destroy()),
+    )
+    cancel.pack(pady=(6, 12))
 
 
 def create_webcam_preview(camera_index: int):
