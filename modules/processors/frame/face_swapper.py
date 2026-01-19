@@ -357,5 +357,8 @@ def process_video(source_path: str, temp_frame_paths: List[str]) -> None:
         )
     # The core processing logic is delegated, which is good.
     modules.processors.frame.core.process_video(
-        source_path, temp_frame_paths, process_frames
+        source_path,
+        temp_frame_paths,
+        process_frames,
+        stage_name="Processing",
     )

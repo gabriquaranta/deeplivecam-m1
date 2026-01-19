@@ -35,8 +35,8 @@ if platform.system() == "Windows":
 ROOT = None
 POPUP = None
 POPUP_LIVE = None
-ROOT_HEIGHT = 700
-ROOT_WIDTH = 600
+ROOT_HEIGHT = 750
+ROOT_WIDTH = 620
 
 PREVIEW = None
 PREVIEW_MAX_HEIGHT = 700
@@ -70,6 +70,9 @@ preview_slider = None
 source_label = None
 target_label = None
 status_label = None
+progress_bar = None
+progress_label = None
+stage_label = None
 popup_status_label = None
 popup_status_label_live = None
 source_label_dict = {}
@@ -158,7 +161,10 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
     target_label.place(relx=0.6, rely=0.1, relwidth=0.3, relheight=0.25)
 
     select_face_button = ctk.CTkButton(
-        root, text=_("Select a face"), cursor="hand2", command=lambda: select_source_path()
+        root,
+        text=_("Select a face"),
+        cursor="hand2",
+        command=lambda: select_source_path(),
     )
     select_face_button.place(relx=0.1, rely=0.4, relwidth=0.3, relheight=0.1)
 
@@ -266,7 +272,7 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
         command=lambda: (
             setattr(modules.globals, "map_faces", map_faces.get()),
             save_switch_states(),
-            close_mapper_window() if not map_faces.get() else None
+            close_mapper_window() if not map_faces.get() else None,
         ),
     )
     map_faces_switch.place(relx=0.1, rely=0.75)
@@ -307,7 +313,10 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
     show_mouth_mask_box_switch.place(relx=0.6, rely=0.55)
 
     start_button = ctk.CTkButton(
-        root, text=_("Start"), cursor="hand2", command=lambda: analyze_target(start, root)
+        root,
+        text=_("Start"),
+        cursor="hand2",
+        command=lambda: analyze_target(start, root),
     )
     start_button.place(relx=0.15, rely=0.80, relwidth=0.2, relheight=0.05)
 
@@ -365,13 +374,30 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
     live_button.place(relx=0.65, rely=0.86, relwidth=0.2, relheight=0.05)
     # --- End Camera Selection ---
 
+    # --- Progress Section ---
+    stage_label = ctk.CTkLabel(root, text="", justify="center")
+    stage_label.place(relx=0.1, rely=0.91, relwidth=0.8)
+
+    progress_bar = ctk.CTkProgressBar(root, height=8)
+    progress_bar.place(relx=0.1, rely=0.945, relwidth=0.65)
+    progress_bar.set(0)
+
+    progress_label = ctk.CTkLabel(root, text="", justify="right")
+    progress_label.place(relx=0.76, rely=0.935, relwidth=0.14)
+
+    # Store references globally
+    globals()["progress_bar"] = progress_bar
+    globals()["progress_label"] = progress_label
+    globals()["stage_label"] = stage_label
+    # --- End Progress Section ---
+
     status_label = ctk.CTkLabel(root, text=None, justify="center")
-    status_label.place(relx=0.1, rely=0.9, relwidth=0.8)
+    status_label.place(relx=0.1, rely=0.97, relwidth=0.8)
 
     donate_label = ctk.CTkLabel(
         root, text="Deep Live Cam", justify="center", cursor="hand2"
     )
-    donate_label.place(relx=0.1, rely=0.95, relwidth=0.8)
+    donate_label.place(relx=0.1, rely=0.99, relwidth=0.8)
     donate_label.configure(
         text_color=ctk.ThemeManager.theme.get("URL").get("text_color")
     )
@@ -380,6 +406,7 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
     )
 
     return root
+
 
 def close_mapper_window():
     global POPUP, POPUP_LIVE
@@ -415,7 +442,7 @@ def analyze_target(start: Callable[[], None], root: ctk.CTk):
 
 
 def create_source_target_popup(
-        start: Callable[[], None], root: ctk.CTk, map: list
+    start: Callable[[], None], root: ctk.CTk, map: list
 ) -> None:
     global POPUP, popup_status_label
 
@@ -484,7 +511,7 @@ def create_source_target_popup(
 
 
 def update_popup_source(
-        scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
+    scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
 ) -> list:
     global source_label_dict
 
@@ -509,7 +536,7 @@ def update_popup_source(
             x_min, y_min, x_max, y_max = face["bbox"]
 
             map[button_num]["source"] = {
-                "cv2": cv2_img[int(y_min): int(y_max), int(x_min): int(x_max)],
+                "cv2": cv2_img[int(y_min) : int(y_max), int(x_min) : int(x_max)],
                 "face": face,
             }
 
@@ -558,6 +585,65 @@ def create_preview(parent: ctk.CTkToplevel) -> ctk.CTkToplevel:
 def update_status(text: str) -> None:
     status_label.configure(text=_(text))
     ROOT.update()
+
+
+def update_progress(current: int, total: int, stage: str = None) -> None:
+    """Update the visual progress bar and optional stage indicator.
+
+    Args:
+        current: Current progress value
+        total: Total value (for percentage calculation)
+        stage: Optional stage name (e.g., "Extracting", "Processing", "Encoding")
+    """
+    global progress_bar, progress_label, stage_label
+
+    if progress_bar is None:
+        return
+
+    try:
+        if total > 0:
+            progress = current / total
+            progress_bar.set(progress)
+            percentage = int(progress * 100)
+            progress_label.configure(text=f"{current}/{total} ({percentage}%)")
+        else:
+            progress_bar.set(0)
+            progress_label.configure(text="")
+
+        if stage is not None and stage_label is not None:
+            # Stage indicator with visual markers
+            stages = ["Extracting", "Processing", "Enhancing", "Encoding"]
+            stage_text = ""
+            for s in stages:
+                if s.lower() in stage.lower():
+                    stage_text += f"● {s}  "
+                elif stages.index(s) < next(
+                    (stages.index(x) for x in stages if x.lower() in stage.lower()), 0
+                ):
+                    stage_text += f"✓ {s}  "
+                else:
+                    stage_text += f"○ {s}  "
+            stage_label.configure(text=stage_text.strip())
+
+        ROOT.update_idletasks()
+    except Exception:
+        pass  # Ignore errors if UI not ready
+
+
+def reset_progress() -> None:
+    """Reset progress bar to initial state."""
+    global progress_bar, progress_label, stage_label
+
+    try:
+        if progress_bar is not None:
+            progress_bar.set(0)
+        if progress_label is not None:
+            progress_label.configure(text="")
+        if stage_label is not None:
+            stage_label.configure(text="")
+        ROOT.update_idletasks()
+    except Exception:
+        pass
 
 
 def update_pop_status(text: str) -> None:
@@ -705,7 +791,7 @@ def fit_image_to_size(image, width: int, height: int):
     ratio_h = height / h
     # Use the smaller ratio to ensure the image fits within the given dimensions
     ratio = min(ratio_w, ratio_h)
-    
+
     # Compute new dimensions, ensuring they're at least 1 pixel
     new_width = max(1, int(ratio * w))
     new_height = max(1, int(ratio * h))
@@ -722,7 +808,7 @@ def render_image_preview(image_path: str, size: Tuple[int, int]) -> ctk.CTkImage
 
 
 def render_video_preview(
-        video_path: str, size: Tuple[int, int], frame_number: int = 0
+    video_path: str, size: Tuple[int, int], frame_number: int = 0
 ) -> ctk.CTkImage:
     capture = cv2.VideoCapture(video_path)
     if frame_number:
@@ -762,7 +848,7 @@ def update_preview(frame_number: int = 0) -> None:
         if modules.globals.nsfw_filter and check_and_ignore_nsfw(temp_frame):
             return
         for frame_processor in get_frame_processors_modules(
-                modules.globals.frame_processors
+            modules.globals.frame_processors
         ):
             temp_frame = frame_processor.process_frame(
                 get_one_face(cv2.imread(modules.globals.source_path)), temp_frame
@@ -795,7 +881,6 @@ def webcam_preview(root: ctk.CTk, camera_index: int):
         create_source_target_popup_for_webcam(
             root, modules.globals.source_target_map, camera_index
         )
-
 
 
 def get_available_cameras():
@@ -961,7 +1046,7 @@ def create_webcam_preview(camera_index: int):
 
 
 def create_source_target_popup_for_webcam(
-        root: ctk.CTk, map: list, camera_index: int
+    root: ctk.CTk, map: list, camera_index: int
 ) -> None:
     global POPUP_LIVE, popup_status_label_live
 
@@ -991,17 +1076,20 @@ def create_source_target_popup_for_webcam(
     popup_status_label_live = ctk.CTkLabel(POPUP_LIVE, text=None, justify="center")
     popup_status_label_live.grid(row=1, column=0, pady=15)
 
-    add_button = ctk.CTkButton(POPUP_LIVE, text=_("Add"), command=lambda: on_add_click())
+    add_button = ctk.CTkButton(
+        POPUP_LIVE, text=_("Add"), command=lambda: on_add_click()
+    )
     add_button.place(relx=0.1, rely=0.92, relwidth=0.2, relheight=0.05)
 
-    clear_button = ctk.CTkButton(POPUP_LIVE, text=_("Clear"), command=lambda: on_clear_click())
+    clear_button = ctk.CTkButton(
+        POPUP_LIVE, text=_("Clear"), command=lambda: on_clear_click()
+    )
     clear_button.place(relx=0.4, rely=0.92, relwidth=0.2, relheight=0.05)
 
     close_button = ctk.CTkButton(
         POPUP_LIVE, text=_("Submit"), command=lambda: on_submit_click()
     )
     close_button.place(relx=0.7, rely=0.92, relwidth=0.2, relheight=0.05)
-
 
 
 def clear_source_target_images(map: list):
@@ -1103,7 +1191,7 @@ def refresh_data(map: list):
 
 
 def update_webcam_source(
-        scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
+    scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
 ) -> list:
     global source_label_dict_live
 
@@ -1128,7 +1216,7 @@ def update_webcam_source(
             x_min, y_min, x_max, y_max = face["bbox"]
 
             map[button_num]["source"] = {
-                "cv2": cv2_img[int(y_min): int(y_max), int(x_min): int(x_max)],
+                "cv2": cv2_img[int(y_min) : int(y_max), int(x_min) : int(x_max)],
                 "face": face,
             }
 
@@ -1155,7 +1243,7 @@ def update_webcam_source(
 
 
 def update_webcam_target(
-        scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
+    scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
 ) -> list:
     global target_label_dict_live
 
@@ -1180,7 +1268,7 @@ def update_webcam_target(
             x_min, y_min, x_max, y_max = face["bbox"]
 
             map[button_num]["target"] = {
-                "cv2": cv2_img[int(y_min): int(y_max), int(x_min): int(x_max)],
+                "cv2": cv2_img[int(y_min) : int(y_max), int(x_min) : int(x_max)],
                 "face": face,
             }
 

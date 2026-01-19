@@ -259,6 +259,7 @@ def process_video(source_path: str, temp_frame_paths: List[str]) -> None:
         temp_frame_paths,
         process_frames,
         num_threads=getattr(modules.globals, "enhancer_threads", 1),
+        stage_name="Enhancing",
     )
 
 
