@@ -1,0 +1,37 @@
+# Deep Live Cam - M1 Mac Optimized Requirements
+# Tested on Apple Silicon (M1/M2/M3) with Python 3.10
+#
+# IMPORTANT: Run ./install.sh to install with correct settings
+# Or install manually:
+#   pip install -r requirements.txt --constraint constraints.txt
+#   Then run: python patch_basicsr.py
+
+# === Core (MUST use numpy 1.x for onnxruntime-silicon) ===
+numpy==1.26.4
+pillow==10.4.0
+tqdm==4.66.4
+psutil==5.9.8
+
+# === OpenCV ===
+opencv-python==4.8.1.78
+
+# === ONNX Runtime for Apple Silicon (CoreML support) ===
+onnx==1.16.1
+onnxruntime-silicon==1.16.3
+
+# === Face Analysis ===
+insightface==0.7.3
+
+# === PyTorch for Apple Silicon (MPS backend) ===
+torch==2.3.1
+torchvision==0.18.1
+
+# === Face Enhancement ===
+gfpgan==1.3.8
+
+# === UI ===
+customtkinter==5.2.2
+tkinterdnd2==0.4.2
+
+# === Camera support (macOS) ===
+cv2_enumerate_cameras
