@@ -32,7 +32,9 @@ live_resizable = True
 # M1-optimized defaults
 if platform.system() == "Darwin":
     max_memory = 8  # Better default for M1 unified memory
-    execution_threads = 4  # Optimal for M1 performance cores
+    # CoreML/MPS handle parallelism internally - using multiple execution threads
+    # causes thread contention and deadlocks with these backends
+    execution_threads = 1
     # GFPGAN runs sequentially on GPU - more threads just add overhead
     enhancer_threads = 1
     # FP16 for GFPGAN - disabled due to input tensor type mismatch in GFPGAN internals

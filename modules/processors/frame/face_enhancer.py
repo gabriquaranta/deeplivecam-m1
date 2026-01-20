@@ -2,9 +2,22 @@ from typing import Any, List
 import cv2
 import threading
 from queue import Queue
-import gfpgan
 import os
+import sys
+import importlib
 
+# GFPGAN/basicsr imports the removed 'torchvision.transforms.functional_tensor'.
+# We must inject a shim BEFORE importing gfpgan.
+try:
+    from torchvision.transforms import functional as _tf
+
+    sys.modules["torchvision.transforms.functional_tensor"] = _tf
+except Exception:
+    pass  # If torchvision isn't available, let gfpgan fail naturally
+
+import gfpgan
+
+import numpy as np
 import modules.globals
 import modules.processors.frame.core
 from modules.core import update_status
@@ -17,6 +30,17 @@ from modules.utilities import (
     is_image,
     is_video,
 )
+
+# Import for FP16 tensor conversion
+try:
+    from basicsr.utils import img2tensor, tensor2img
+    from torchvision.transforms import functional as TF
+
+    normalize = TF.normalize
+    HAS_BASICSR = True
+except Exception as e:
+    print(f"[DLC.FACE-ENHANCER] Warning: basicsr/torchvision import failed: {e}")
+    HAS_BASICSR = False
 
 FACE_ENHANCER = None
 THREAD_LOCK = threading.Lock()
@@ -156,7 +180,7 @@ def enhance_face(temp_frame: Frame) -> Frame:
     return temp_frame
 
 
-def process_frame(source_face: Face, temp_frame: Frame) -> Frame:
+def process_frame(source_face: Face, temp_frame: Frame) -> Frame:  # type: ignore
     # Skip face detection - GFPGAN's enhance() already detects faces internally
     # This avoids running InsightFace twice when used with face_swapper
     temp_frame = enhance_face(temp_frame)
@@ -167,82 +191,16 @@ def process_frames(
     source_path: str, temp_frame_paths: List[str], progress: Any = None
 ) -> None:
     """
-    Process frames using I/O pipelining: overlaps disk read/write with GPU inference.
-    3-stage pipeline: Reader -> GPU Worker -> Writer
+    Process frames sequentially - MPS/GFPGAN can deadlock with threading.
     """
-    # For small batches, skip threading overhead
-    if len(temp_frame_paths) < 5:
-        jpeg_params = [cv2.IMWRITE_JPEG_QUALITY, 95]
-        for temp_frame_path in temp_frame_paths:
-            temp_frame = cv2.imread(temp_frame_path)
+    jpeg_params = [cv2.IMWRITE_JPEG_QUALITY, 95]
+    for temp_frame_path in temp_frame_paths:
+        temp_frame = cv2.imread(temp_frame_path)
+        if temp_frame is not None:
             result = process_frame(None, temp_frame)
             cv2.imwrite(temp_frame_path, result, jpeg_params)
-            if progress:
-                progress.update(1)
-        return
-
-    # Pipeline queues with small buffer to limit memory usage
-    read_queue: Queue = Queue(maxsize=2)
-    write_queue: Queue = Queue(maxsize=2)
-    jpeg_params = [cv2.IMWRITE_JPEG_QUALITY, 95]
-    error_occurred = threading.Event()
-
-    def reader_thread():
-        """Stage 1: Read frames from disk into queue"""
-        try:
-            for path in temp_frame_paths:
-                if error_occurred.is_set():
-                    break
-                frame = cv2.imread(path)
-                read_queue.put((path, frame))
-        finally:
-            read_queue.put(None)  # Sentinel to signal completion
-
-    def gpu_thread():
-        """Stage 2: Run GFPGAN enhancement on GPU"""
-        try:
-            while not error_occurred.is_set():
-                item = read_queue.get()
-                if item is None:
-                    break
-                path, frame = item
-                if frame is not None:
-                    result = enhance_face(frame)
-                else:
-                    result = None
-                write_queue.put((path, result))
-        except Exception as e:
-            error_occurred.set()
-            print(f"{NAME}: GPU error: {e}")
-        finally:
-            write_queue.put(None)  # Sentinel to signal completion
-
-    def writer_thread():
-        """Stage 3: Write enhanced frames back to disk"""
-        try:
-            while not error_occurred.is_set():
-                item = write_queue.get()
-                if item is None:
-                    break
-                path, result = item
-                if result is not None:
-                    cv2.imwrite(path, result, jpeg_params)
-                if progress:
-                    progress.update(1)
-        except Exception as e:
-            error_occurred.set()
-            print(f"{NAME}: Write error: {e}")
-
-    # Start all pipeline stages
-    threads = [
-        threading.Thread(target=reader_thread, name="enhancer-reader"),
-        threading.Thread(target=gpu_thread, name="enhancer-gpu"),
-        threading.Thread(target=writer_thread, name="enhancer-writer"),
-    ]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+        if progress:
+            progress.update(1)
 
 
 def process_image(source_path: str, target_path: str, output_path: str) -> None:

@@ -4,8 +4,9 @@ import platform
 
 # M1 Mac optimizations - set before other imports
 if platform.system() == "Darwin":
-    # Optimize for Apple Silicon unified memory architecture
-    os.environ["OMP_NUM_THREADS"] = str(os.cpu_count() or 4)
+    # CoreML and MPS handle their own parallelism - setting OMP_NUM_THREADS > 1
+    # causes thread contention and deadlocks. Use single thread for OpenMP.
+    os.environ["OMP_NUM_THREADS"] = "1"
     os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 else:
     # single thread doubles cuda performance - needs to be set before torch import

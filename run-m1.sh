@@ -35,14 +35,16 @@ TOTAL_MEM_BYTES=$(sysctl -n hw.memsize)
 TOTAL_MEM_GB=$((TOTAL_MEM_BYTES / 1024 / 1024 / 1024))
 SUGGESTED_MEM=$((TOTAL_MEM_GB * 3 / 4))
 CPU_COUNT=$(sysctl -n hw.ncpu)
-SUGGESTED_THREADS=$((CPU_COUNT > 6 ? 6 : CPU_COUNT))
+# CoreML and MPS handle parallelism internally - using multiple execution threads
+# causes thread contention and deadlocks. Use single thread for frame processing.
+SUGGESTED_THREADS=1
 
 echo ""
 echo "System Configuration:"
 echo "  Total Memory: ${TOTAL_MEM_GB}GB"
 echo "  Using Memory: ${SUGGESTED_MEM}GB (75%)"
 echo "  CPU Cores: ${CPU_COUNT}"
-echo "  Threads: ${SUGGESTED_THREADS}"
+echo "  Execution Threads: ${SUGGESTED_THREADS} (CoreML/MPS handle parallelism)"
 echo ""
 echo "Execution Provider: CoreML (Apple Neural Engine)"
 echo "Video Encoder: h264_videotoolbox (Hardware)"
