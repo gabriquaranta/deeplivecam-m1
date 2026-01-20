@@ -22,6 +22,42 @@ from pathlib import Path
 FACE_ANALYSER = None
 
 
+def extract_5_landmarks(face: Any) -> Any:
+    """
+    Extract 5-point landmarks from InsightFace Face object.
+
+    GFPGAN expects landmarks in format:
+    [[left_eye_x, left_eye_y],
+     [right_eye_x, right_eye_y],
+     [nose_x, nose_y],
+     [left_mouth_x, left_mouth_y],
+     [right_mouth_x, right_mouth_y]]
+
+    Returns None if landmarks cannot be extracted.
+    """
+    if face is None:
+        return None
+
+    # InsightFace provides kps (keypoints) as 5-point landmarks directly
+    if hasattr(face, "kps") and face.kps is not None:
+        return face.kps.copy()
+
+    # Fallback: convert from 106-point landmarks if available
+    if hasattr(face, "landmark_2d_106") and face.landmark_2d_106 is not None:
+        lm = face.landmark_2d_106
+        return np.array(
+            [
+                lm[38],  # left eye
+                lm[88],  # right eye
+                lm[86],  # nose
+                lm[52],  # left mouth corner
+                lm[61],  # right mouth corner
+            ]
+        )
+
+    return None
+
+
 def get_face_analyser() -> Any:
     global FACE_ANALYSER
 

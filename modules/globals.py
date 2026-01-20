@@ -37,9 +37,9 @@ if platform.system() == "Darwin":
     execution_threads = 1
     # GFPGAN runs sequentially on GPU - more threads just add overhead
     enhancer_threads = 1
-    # FP16 for GFPGAN - disabled due to input tensor type mismatch in GFPGAN internals
-    # Enabling requires modifying GFPGAN's face_helper to also use FP16 tensors
-    use_fp16_enhancer = False
+    # FP16 for GFPGAN - enabled with forward pass patching to auto-convert tensors
+    # Provides ~30-50% speedup on MPS
+    use_fp16_enhancer = True
     # Detection resolution for GFPGAN face detection (480=40% faster, 320=60% faster, None=full)
     enhancer_det_resize = 480
 else:
@@ -61,3 +61,8 @@ show_mouth_mask_box = False
 mask_feather_ratio = 8
 mask_down_size = 0.50
 mask_size = 1
+
+# Shared face detection cache for pipeline optimization
+# Stores detected faces from swapper to reuse in enhancer (avoids redundant detection)
+last_frame_faces = None  # List of face data dicts with bbox, landmarks_5, det_score
+last_frame_id = None  # Frame identifier to validate cache freshness

@@ -10,7 +10,12 @@ import modules.processors.frame.core
 # Ensure update_status is imported if not already globally accessible
 # If it's part of modules.core, it might already be accessible via modules.core.update_status
 from modules.core import update_status
-from modules.face_analyser import get_one_face, get_many_faces, default_source_face
+from modules.face_analyser import (
+    get_one_face,
+    get_many_faces,
+    default_source_face,
+    extract_5_landmarks,
+)
 from modules.typing import Face, Frame
 from modules.utilities import (
     conditional_download,
@@ -144,19 +149,44 @@ def process_frame(source_face: Face, temp_frame: Frame) -> Frame:
     #     temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_BGR2RGB)
     #     original_was_bgr = False # Now it's RGB
 
+    detected_faces = None
+
     if modules.globals.many_faces:
         many_faces = get_many_faces(temp_frame)
+        detected_faces = many_faces
         if many_faces:
             for target_face in many_faces:
                 temp_frame = swap_face(source_face, target_face, temp_frame)
     else:
         target_face = get_one_face(temp_frame)
+        detected_faces = [target_face] if target_face else None
         if target_face:
             temp_frame = swap_face(source_face, target_face, temp_frame)
 
-    # Convert back if necessary (example, might not be needed depending on workflow)
-    # if modules.globals.color_correction and not original_was_bgr:
-    #      temp_frame = cv2.cvtColor(temp_frame, cv2.COLOR_RGB2BGR)
+    # Store detected faces for enhancer to reuse (avoids redundant detection)
+    # Only cache when face enhancement is enabled to avoid overhead otherwise
+    if modules.globals.fp_ui.get("face_enhancer", False) and detected_faces:
+        try:
+            modules.globals.last_frame_faces = [
+                {
+                    "bbox": (
+                        face.bbox.tolist()
+                        if hasattr(face.bbox, "tolist")
+                        else list(face.bbox)
+                    ),
+                    "landmarks_5": extract_5_landmarks(face),
+                    "det_score": (
+                        float(face.det_score) if hasattr(face, "det_score") else 1.0
+                    ),
+                }
+                for face in detected_faces
+                if face is not None
+            ]
+            modules.globals.last_frame_id = id(temp_frame)
+        except Exception:
+            # Don't let cache failures block processing
+            modules.globals.last_frame_faces = None
+            modules.globals.last_frame_id = None
 
     return temp_frame
 

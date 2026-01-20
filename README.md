@@ -66,11 +66,8 @@ brew install python@3.10
 brew install python-tk@3.10
 
 # Create and activate virtual environment with Python 3.10
-python3.10 -m venv venv
-source venv/bin/activate
-
 # Install dependencies
-pip install -r requirements.txt
+./install.sh
 ```
 
 **Important Notes for macOS:**
