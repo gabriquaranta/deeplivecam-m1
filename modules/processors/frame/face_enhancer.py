@@ -2,22 +2,9 @@ from typing import Any, List
 import cv2
 import threading
 from queue import Queue
-import os
-import sys
-import importlib
-
-# GFPGAN/basicsr imports the removed 'torchvision.transforms.functional_tensor'.
-# We must inject a shim BEFORE importing gfpgan.
-try:
-    from torchvision.transforms import functional as _tf
-
-    sys.modules["torchvision.transforms.functional_tensor"] = _tf
-except Exception:
-    pass  # If torchvision isn't available, let gfpgan fail naturally
-
 import gfpgan
+import os
 
-import numpy as np
 import modules.globals
 import modules.processors.frame.core
 from modules.core import update_status
@@ -30,17 +17,6 @@ from modules.utilities import (
     is_image,
     is_video,
 )
-
-# Import for FP16 tensor conversion
-try:
-    from basicsr.utils import img2tensor, tensor2img
-    from torchvision.transforms import functional as TF
-
-    normalize = TF.normalize
-    HAS_BASICSR = True
-except Exception as e:
-    print(f"[DLC.FACE-ENHANCER] Warning: basicsr/torchvision import failed: {e}")
-    HAS_BASICSR = False
 
 FACE_ENHANCER = None
 THREAD_LOCK = threading.Lock()
@@ -113,24 +89,9 @@ def get_face_enhancer() -> Any:
                 )
 
                 # Convert to FP16 on MPS for ~30-50% speedup
-                # We patch the forward pass to auto-convert input tensors to FP16
                 use_fp16 = getattr(modules.globals, "use_fp16_enhancer", False)
                 if use_fp16 and device_name == "mps":
                     FACE_ENHANCER.gfpgan = FACE_ENHANCER.gfpgan.half()
-
-                    # Patch forward to handle FP16 input conversion
-                    # This fixes tensor type mismatch when FP32 tensors from img2tensor
-                    # are fed to the FP16 model
-                    original_forward = FACE_ENHANCER.gfpgan.forward
-
-                    @torch.no_grad()
-                    def fp16_forward(x, return_rgb=True, weight=0.5):
-                        # Convert input tensor to FP16 to match model weights
-                        if x.dtype != torch.float16:
-                            x = x.half()
-                        return original_forward(x, return_rgb=return_rgb, weight=weight)
-
-                    FACE_ENHANCER.gfpgan.forward = fp16_forward
                     device_name = "mps (FP16)"
 
                 # Optimize face detection by reducing resolution (40-60% faster detection)
@@ -195,107 +156,9 @@ def enhance_face(temp_frame: Frame) -> Frame:
     return temp_frame
 
 
-def enhance_face_with_external_detection(temp_frame: Frame, faces_data: list) -> Frame:
-    """
-    Enhance faces using externally-detected face data (from face_swapper).
-
-    This bypasses GFPGAN's internal RetinaFace detection for a ~20-30% speedup
-    when faces have already been detected by InsightFace in the swapper.
-
-    Args:
-        temp_frame: The frame to enhance
-        faces_data: List of dicts with 'bbox', 'landmarks_5', 'det_score' keys
-
-    Returns:
-        Enhanced frame with faces restored
-    """
-    if not HAS_BASICSR:
-        # Fallback if basicsr imports failed
-        return enhance_face(temp_frame)
-
-    enhancer = get_face_enhancer()
-
-    # Clear previous face data from face_helper
-    enhancer.face_helper.clean_all()
-
-    # Read the image into face_helper
-    enhancer.face_helper.read_image(temp_frame)
-
-    # Inject external face data instead of running detection
-    valid_faces = 0
-    for face_data in faces_data:
-        landmarks = face_data.get("landmarks_5")
-        if landmarks is not None:
-            enhancer.face_helper.all_landmarks_5.append(np.array(landmarks))
-            # GFPGAN expects det_faces as [x1, y1, x2, y2, score]
-            bbox = face_data.get("bbox", [0, 0, 0, 0])
-            score = face_data.get("det_score", 1.0)
-            if len(bbox) >= 4:
-                det_face = bbox[:4] + [score] if len(bbox) == 4 else bbox[:5]
-                enhancer.face_helper.det_faces.append(det_face)
-            valid_faces += 1
-
-    if valid_faces == 0:
-        # No valid faces provided, fall back to internal detection
-        return enhance_face(temp_frame)
-
-    # Align and warp faces using injected landmarks
-    enhancer.face_helper.align_warp_face()
-
-    # Check if we're using FP16
-    use_fp16 = getattr(modules.globals, "use_fp16_enhancer", False)
-    device = enhancer.device
-
-    # Run GFPGAN enhancement on each cropped face
-    for cropped_face in enhancer.face_helper.cropped_faces:
-        # Prepare tensor (same as GFPGAN's enhance() method)
-        cropped_face_t = img2tensor(cropped_face / 255.0, bgr2rgb=True, float32=True)
-        normalize(cropped_face_t, (0.5, 0.5, 0.5), (0.5, 0.5, 0.5), inplace=True)
-        cropped_face_t = cropped_face_t.unsqueeze(0).to(device)
-
-        # FP16 conversion if enabled (forward pass patch handles this too, but explicit is safer)
-        if use_fp16 and cropped_face_t.dtype != torch.float16:
-            cropped_face_t = cropped_face_t.half()
-
-        try:
-            with torch.no_grad():
-                output = enhancer.gfpgan(cropped_face_t, return_rgb=False, weight=0.5)[
-                    0
-                ]
-            restored_face = tensor2img(output.squeeze(0), rgb2bgr=True, min_max=(-1, 1))
-        except Exception as e:
-            print(f"{NAME}: GFPGAN inference failed: {e}")
-            restored_face = cropped_face
-
-        restored_face = restored_face.astype("uint8")
-        enhancer.face_helper.add_restored_face(restored_face)
-
-    # Paste enhanced faces back to original image
-    enhancer.face_helper.get_inverse_affine(None)
-    restored_img = enhancer.face_helper.paste_faces_to_input_image(upsample_img=None)
-
-    return restored_img
-
-
-def process_frame(source_face: Face, temp_frame: Frame) -> Frame:  # type: ignore
-    # Check if we have cached face data from swapper (avoids redundant detection)
-    cached_faces = getattr(modules.globals, "last_frame_faces", None)
-    cached_frame_id = getattr(modules.globals, "last_frame_id", None)
-
-    # Use cached faces if available and frame ID matches
-    if cached_faces and cached_frame_id is not None:
-        try:
-            temp_frame = enhance_face_with_external_detection(temp_frame, cached_faces)
-            # Clear cache after use to prevent stale data
-            modules.globals.last_frame_faces = None
-            modules.globals.last_frame_id = None
-            return temp_frame
-        except Exception as e:
-            print(
-                f"{NAME}: External face enhancement failed ({e}), falling back to detection"
-            )
-
-    # No cached data or cache failed, use standard detection
+def process_frame(source_face: Face, temp_frame: Frame) -> Frame:
+    # Skip face detection - GFPGAN's enhance() already detects faces internally
+    # This avoids running InsightFace twice when used with face_swapper
     temp_frame = enhance_face(temp_frame)
     return temp_frame
 
@@ -304,16 +167,82 @@ def process_frames(
     source_path: str, temp_frame_paths: List[str], progress: Any = None
 ) -> None:
     """
-    Process frames sequentially - MPS/GFPGAN can deadlock with threading.
+    Process frames using I/O pipelining: overlaps disk read/write with GPU inference.
+    3-stage pipeline: Reader -> GPU Worker -> Writer
     """
-    jpeg_params = [cv2.IMWRITE_JPEG_QUALITY, 95]
-    for temp_frame_path in temp_frame_paths:
-        temp_frame = cv2.imread(temp_frame_path)
-        if temp_frame is not None:
+    # For small batches, skip threading overhead
+    if len(temp_frame_paths) < 5:
+        jpeg_params = [cv2.IMWRITE_JPEG_QUALITY, 95]
+        for temp_frame_path in temp_frame_paths:
+            temp_frame = cv2.imread(temp_frame_path)
             result = process_frame(None, temp_frame)
             cv2.imwrite(temp_frame_path, result, jpeg_params)
-        if progress:
-            progress.update(1)
+            if progress:
+                progress.update(1)
+        return
+
+    # Pipeline queues with small buffer to limit memory usage
+    read_queue: Queue = Queue(maxsize=2)
+    write_queue: Queue = Queue(maxsize=2)
+    jpeg_params = [cv2.IMWRITE_JPEG_QUALITY, 95]
+    error_occurred = threading.Event()
+
+    def reader_thread():
+        """Stage 1: Read frames from disk into queue"""
+        try:
+            for path in temp_frame_paths:
+                if error_occurred.is_set():
+                    break
+                frame = cv2.imread(path)
+                read_queue.put((path, frame))
+        finally:
+            read_queue.put(None)  # Sentinel to signal completion
+
+    def gpu_thread():
+        """Stage 2: Run GFPGAN enhancement on GPU"""
+        try:
+            while not error_occurred.is_set():
+                item = read_queue.get()
+                if item is None:
+                    break
+                path, frame = item
+                if frame is not None:
+                    result = enhance_face(frame)
+                else:
+                    result = None
+                write_queue.put((path, result))
+        except Exception as e:
+            error_occurred.set()
+            print(f"{NAME}: GPU error: {e}")
+        finally:
+            write_queue.put(None)  # Sentinel to signal completion
+
+    def writer_thread():
+        """Stage 3: Write enhanced frames back to disk"""
+        try:
+            while not error_occurred.is_set():
+                item = write_queue.get()
+                if item is None:
+                    break
+                path, result = item
+                if result is not None:
+                    cv2.imwrite(path, result, jpeg_params)
+                if progress:
+                    progress.update(1)
+        except Exception as e:
+            error_occurred.set()
+            print(f"{NAME}: Write error: {e}")
+
+    # Start all pipeline stages
+    threads = [
+        threading.Thread(target=reader_thread, name="enhancer-reader"),
+        threading.Thread(target=gpu_thread, name="enhancer-gpu"),
+        threading.Thread(target=writer_thread, name="enhancer-writer"),
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
 
 def process_image(source_path: str, target_path: str, output_path: str) -> None:
@@ -330,7 +259,6 @@ def process_video(source_path: str, temp_frame_paths: List[str]) -> None:
         temp_frame_paths,
         process_frames,
         num_threads=getattr(modules.globals, "enhancer_threads", 1),
-        stage_name="Enhancing",
     )
 
 

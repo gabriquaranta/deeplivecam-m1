@@ -105,7 +105,6 @@ def process_video(
     frame_paths: list[str],
     process_frames: Callable[[str, List[str], Any], None],
     num_threads: int = None,
-    stage_name: str = "Processing",
 ) -> None:
     import platform
     import torch
@@ -129,18 +128,9 @@ def process_video(
         "{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}{postfix}]"
     )
     total = len(frame_paths)
-
-    # Try to get UI progress callback
-    try:
-        from modules import ui
-
-        ui_update = lambda n, t: ui.update_progress(n, t, stage_name)
-    except Exception:
-        ui_update = lambda n, t: None
-
     with tqdm(
         total=total,
-        desc=stage_name,
+        desc="Processing",
         unit="frame",
         dynamic_ncols=True,
         bar_format=progress_bar_format,
@@ -152,19 +142,6 @@ def process_video(
                 "max_mem": f"{modules.globals.max_memory}GB",
             }
         )
-
-        # Wrap progress to also update UI
-        original_update = progress.update
-
-        def wrapped_update(n=1):
-            original_update(n)
-            ui_update(progress.n, total)
-
-        progress.update = wrapped_update
-
-        # Initial UI update
-        ui_update(0, total)
-
         multi_process_frame(
             source_path, frame_paths, process_frames, progress, num_threads
         )

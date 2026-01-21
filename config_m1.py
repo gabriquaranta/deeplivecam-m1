@@ -24,19 +24,19 @@ def apply_m1_optimizations():
     os.environ["PYTORCH_MPS_HIGH_WATERMARK_RATIO"] = "0.0"
 
     # Thread optimizations for Apple Silicon
-    # CoreML and MPS manage their own internal parallelism
-    # Setting OMP_NUM_THREADS > 1 causes thread contention and deadlocks
-    os.environ["OMP_NUM_THREADS"] = "1"
-    os.environ["MKL_NUM_THREADS"] = "1"
+    cpu_count = multiprocessing.cpu_count()
+
+    # M1 has performance and efficiency cores
+    # Using half the cores is often optimal for sustained performance
+    optimal_threads = str(max(2, cpu_count // 2))
+    os.environ["OMP_NUM_THREADS"] = optimal_threads
+    os.environ["MKL_NUM_THREADS"] = optimal_threads
 
     # Reduce memory fragmentation
     os.environ["MALLOC_MMAP_THRESHOLD_"] = "1048576"
 
-    cpu_count = multiprocessing.cpu_count()
     print(f"[M1 Optimization] Applied optimizations for {cpu_count}-core Apple Silicon")
-    print(
-        f"[M1 Optimization] Thread count: 1 (CoreML/MPS handle parallelism internally)"
-    )
+    print(f"[M1 Optimization] Thread count: {optimal_threads}")
 
     return True
 

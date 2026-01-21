@@ -4,9 +4,8 @@ import platform
 
 # M1 Mac optimizations - set before other imports
 if platform.system() == "Darwin":
-    # CoreML and MPS handle their own parallelism - setting OMP_NUM_THREADS > 1
-    # causes thread contention and deadlocks. Use single thread for OpenMP.
-    os.environ["OMP_NUM_THREADS"] = "1"
+    # Optimize for Apple Silicon unified memory architecture
+    os.environ["OMP_NUM_THREADS"] = str(os.cpu_count() or 4)
     os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 else:
     # single thread doubles cuda performance - needs to be set before torch import
@@ -435,28 +434,7 @@ def update_status(message: str, scope: str = "DLC.CORE") -> None:
         ui.update_status(message)
 
 
-def update_progress(current: int, total: int, stage: str = None) -> None:
-    """Update UI progress bar."""
-    if not modules.globals.headless:
-        try:
-            ui.update_progress(current, total, stage)
-        except Exception:
-            pass
-
-
-def reset_progress() -> None:
-    """Reset UI progress bar."""
-    if not modules.globals.headless:
-        try:
-            ui.reset_progress()
-        except Exception:
-            pass
-
-
 def start() -> None:
-    # Reset progress bar at start
-    reset_progress()
-
     # Ensure models are preloaded before processing starts
     # This handles cases where processors are added via UI after initial preload
     preload_models()
@@ -502,13 +480,10 @@ def start() -> None:
         update_status("Creating temp resources...")
         create_temp(modules.globals.target_path)
         update_status("Extracting frames...")
-        update_progress(0, 1, "Extracting")  # Show extracting stage
         extract_frames(modules.globals.target_path)
         update_status("Frames extracted!")
 
     temp_frame_paths = get_temp_frame_paths(modules.globals.target_path)
-    total_frames = len(temp_frame_paths)
-
     for frame_processor in get_frame_processors_modules(
         modules.globals.frame_processors
     ):
@@ -517,7 +492,6 @@ def start() -> None:
         update_status("Done!", frame_processor.NAME)
         release_resources()
     # handles fps
-    update_progress(0, 1, "Encoding")  # Show encoding stage
     if modules.globals.keep_fps:
         update_status("Detecting fps...")
         fps = detect_fps(modules.globals.target_path)
@@ -537,8 +511,6 @@ def start() -> None:
         move_temp(modules.globals.target_path, modules.globals.output_path)
     # clean and validate
     clean_temp(modules.globals.target_path)
-    update_progress(1, 1, "Encoding")  # Complete encoding stage
-    reset_progress()  # Reset progress bar when done
     if is_video(modules.globals.target_path):
         update_status("Processing to video succeed!")
     else:

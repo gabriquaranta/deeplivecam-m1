@@ -35,8 +35,8 @@ if platform.system() == "Windows":
 ROOT = None
 POPUP = None
 POPUP_LIVE = None
-ROOT_HEIGHT = 820
-ROOT_WIDTH = 680
+ROOT_HEIGHT = 700
+ROOT_WIDTH = 600
 
 PREVIEW = None
 PREVIEW_MAX_HEIGHT = 700
@@ -57,8 +57,8 @@ POPUP_LIVE_SCROLL_HEIGHT = 700
 MAPPER_PREVIEW_MAX_HEIGHT = 100
 MAPPER_PREVIEW_MAX_WIDTH = 100
 
-DEFAULT_BUTTON_WIDTH = 220
-DEFAULT_BUTTON_HEIGHT = 48
+DEFAULT_BUTTON_WIDTH = 200
+DEFAULT_BUTTON_HEIGHT = 40
 
 RECENT_DIRECTORY_SOURCE = None
 RECENT_DIRECTORY_TARGET = None
@@ -70,9 +70,6 @@ preview_slider = None
 source_label = None
 target_label = None
 status_label = None
-progress_bar = None
-progress_label = None
-stage_label = None
 popup_status_label = None
 popup_status_label_live = None
 source_label_dict = {}
@@ -154,68 +151,34 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
     root.configure()
     root.protocol("WM_DELETE_WINDOW", lambda: destroy())
 
-    # --- Media Selection Section (Liquid Glass: content layer) ---
-    source_label = ctk.CTkLabel(root, text=None, corner_radius=16)
-    source_label.place(relx=0.08, rely=0.04, relwidth=0.34, relheight=0.24)
+    source_label = ctk.CTkLabel(root, text=None)
+    source_label.place(relx=0.1, rely=0.1, relwidth=0.3, relheight=0.25)
 
-    target_label = ctk.CTkLabel(root, text=None, corner_radius=16)
-    target_label.place(relx=0.58, rely=0.04, relwidth=0.34, relheight=0.24)
+    target_label = ctk.CTkLabel(root, text=None)
+    target_label.place(relx=0.6, rely=0.1, relwidth=0.3, relheight=0.25)
 
     select_face_button = ctk.CTkButton(
-        root,
-        text=_("Select a face"),
-        cursor="hand2",
-        command=lambda: select_source_path(),
-        height=44,
+        root, text=_("Select a face"), cursor="hand2", command=lambda: select_source_path()
     )
-    select_face_button.place(relx=0.08, rely=0.30, relwidth=0.34, relheight=0.055)
+    select_face_button.place(relx=0.1, rely=0.4, relwidth=0.3, relheight=0.1)
 
     swap_faces_button = ctk.CTkButton(
-        root,
-        text="⇄",
-        cursor="hand2",
-        command=lambda: swap_faces_paths(),
-        height=44,
-        fg_color="transparent",
-        text_color=["#007AFF", "#0A84FF"],
-        hover_color=["#E5E5EA", "#39393D"],
+        root, text="↔", cursor="hand2", command=lambda: swap_faces_paths()
     )
-    swap_faces_button.place(relx=0.44, rely=0.30, relwidth=0.12, relheight=0.055)
+    swap_faces_button.place(relx=0.45, rely=0.4, relwidth=0.1, relheight=0.1)
 
     select_target_button = ctk.CTkButton(
         root,
         text=_("Select a target"),
         cursor="hand2",
         command=lambda: select_target_path(),
-        height=44,
     )
-    select_target_button.place(relx=0.58, rely=0.30, relwidth=0.34, relheight=0.055)
-
-    # --- Options Section (Liquid Glass: grouped controls with room to breathe) ---
-    # Options container frame for visual grouping
-    options_frame = ctk.CTkFrame(
-        root, corner_radius=20, fg_color=["#F2F2F7", "#1C1C1E"]
-    )
-    options_frame.place(relx=0.04, rely=0.38, relwidth=0.92, relheight=0.34)
-
-    # Section header with title-style capitalization (Liquid Glass guideline)
-    options_header = ctk.CTkLabel(
-        options_frame,
-        text="Options",
-        font=ctk.CTkFont(size=13, weight="bold"),
-        text_color=["#8E8E93", "#8E8E93"],
-        anchor="w",
-    )
-    options_header.place(relx=0.04, rely=0.02, relwidth=0.92)
-
-    # Left column options (increased row spacing per Liquid Glass)
-    row_height = 0.17
-    row_start = 0.14
+    select_target_button.place(relx=0.6, rely=0.4, relwidth=0.3, relheight=0.1)
 
     keep_fps_value = ctk.BooleanVar(value=modules.globals.keep_fps)
     keep_fps_checkbox = ctk.CTkSwitch(
-        options_frame,
-        text=_("Keep FPS"),
+        root,
+        text=_("Keep fps"),
         variable=keep_fps_value,
         cursor="hand2",
         command=lambda: (
@@ -223,12 +186,12 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
             save_switch_states(),
         ),
     )
-    keep_fps_checkbox.place(relx=0.04, rely=row_start)
+    keep_fps_checkbox.place(relx=0.1, rely=0.6)
 
     keep_frames_value = ctk.BooleanVar(value=modules.globals.keep_frames)
     keep_frames_switch = ctk.CTkSwitch(
-        options_frame,
-        text=_("Keep Frames"),
+        root,
+        text=_("Keep frames"),
         variable=keep_frames_value,
         cursor="hand2",
         command=lambda: (
@@ -236,11 +199,11 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
             save_switch_states(),
         ),
     )
-    keep_frames_switch.place(relx=0.04, rely=row_start + row_height)
+    keep_frames_switch.place(relx=0.1, rely=0.65)
 
     enhancer_value = ctk.BooleanVar(value=modules.globals.fp_ui["face_enhancer"])
     enhancer_switch = ctk.CTkSwitch(
-        options_frame,
+        root,
         text=_("Face Enhancer"),
         variable=enhancer_value,
         cursor="hand2",
@@ -249,37 +212,12 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
             save_switch_states(),
         ),
     )
-    enhancer_switch.place(relx=0.04, rely=row_start + row_height * 2)
+    enhancer_switch.place(relx=0.1, rely=0.7)
 
-    mouth_mask_var = ctk.BooleanVar(value=modules.globals.mouth_mask)
-    mouth_mask_switch = ctk.CTkSwitch(
-        options_frame,
-        text=_("Mouth Mask"),
-        variable=mouth_mask_var,
-        cursor="hand2",
-        command=lambda: setattr(modules.globals, "mouth_mask", mouth_mask_var.get()),
-    )
-    mouth_mask_switch.place(relx=0.04, rely=row_start + row_height * 3)
-
-    map_faces = ctk.BooleanVar(value=modules.globals.map_faces)
-    map_faces_switch = ctk.CTkSwitch(
-        options_frame,
-        text=_("Map Faces"),
-        variable=map_faces,
-        cursor="hand2",
-        command=lambda: (
-            setattr(modules.globals, "map_faces", map_faces.get()),
-            save_switch_states(),
-            close_mapper_window() if not map_faces.get() else None,
-        ),
-    )
-    map_faces_switch.place(relx=0.04, rely=row_start + row_height * 4)
-
-    # Right column options
     keep_audio_value = ctk.BooleanVar(value=modules.globals.keep_audio)
     keep_audio_switch = ctk.CTkSwitch(
-        options_frame,
-        text=_("Keep Audio"),
+        root,
+        text=_("Keep audio"),
         variable=keep_audio_value,
         cursor="hand2",
         command=lambda: (
@@ -287,12 +225,12 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
             save_switch_states(),
         ),
     )
-    keep_audio_switch.place(relx=0.52, rely=row_start)
+    keep_audio_switch.place(relx=0.6, rely=0.6)
 
     many_faces_value = ctk.BooleanVar(value=modules.globals.many_faces)
     many_faces_switch = ctk.CTkSwitch(
-        options_frame,
-        text=_("Many Faces"),
+        root,
+        text=_("Many faces"),
         variable=many_faces_value,
         cursor="hand2",
         command=lambda: (
@@ -300,11 +238,11 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
             save_switch_states(),
         ),
     )
-    many_faces_switch.place(relx=0.52, rely=row_start + row_height)
+    many_faces_switch.place(relx=0.6, rely=0.65)
 
     color_correction_value = ctk.BooleanVar(value=modules.globals.color_correction)
     color_correction_switch = ctk.CTkSwitch(
-        options_frame,
+        root,
         text=_("Fix Blueish Cam"),
         variable=color_correction_value,
         cursor="hand2",
@@ -313,23 +251,29 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
             save_switch_states(),
         ),
     )
-    color_correction_switch.place(relx=0.52, rely=row_start + row_height * 2)
+    color_correction_switch.place(relx=0.6, rely=0.70)
 
-    show_mouth_mask_box_var = ctk.BooleanVar(value=modules.globals.show_mouth_mask_box)
-    show_mouth_mask_box_switch = ctk.CTkSwitch(
-        options_frame,
-        text=_("Show Mask Box"),
-        variable=show_mouth_mask_box_var,
+    #    nsfw_value = ctk.BooleanVar(value=modules.globals.nsfw_filter)
+    #    nsfw_switch = ctk.CTkSwitch(root, text='NSFW filter', variable=nsfw_value, cursor='hand2', command=lambda: setattr(modules.globals, 'nsfw_filter', nsfw_value.get()))
+    #    nsfw_switch.place(relx=0.6, rely=0.7)
+
+    map_faces = ctk.BooleanVar(value=modules.globals.map_faces)
+    map_faces_switch = ctk.CTkSwitch(
+        root,
+        text=_("Map faces"),
+        variable=map_faces,
         cursor="hand2",
-        command=lambda: setattr(
-            modules.globals, "show_mouth_mask_box", show_mouth_mask_box_var.get()
+        command=lambda: (
+            setattr(modules.globals, "map_faces", map_faces.get()),
+            save_switch_states(),
+            close_mapper_window() if not map_faces.get() else None
         ),
     )
-    show_mouth_mask_box_switch.place(relx=0.52, rely=row_start + row_height * 3)
+    map_faces_switch.place(relx=0.1, rely=0.75)
 
     show_fps_value = ctk.BooleanVar(value=modules.globals.show_fps)
     show_fps_switch = ctk.CTkSwitch(
-        options_frame,
+        root,
         text=_("Show FPS"),
         variable=show_fps_value,
         cursor="hand2",
@@ -338,122 +282,96 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
             save_switch_states(),
         ),
     )
-    show_fps_switch.place(relx=0.52, rely=row_start + row_height * 4)
+    show_fps_switch.place(relx=0.6, rely=0.75)
 
-    # --- Controls Section (Liquid Glass: grouped toolbar items) ---
-    # Evenly spaced primary controls with larger touch targets
-    btn_w = 0.21
-    gap = (1.0 - (btn_w * 4)) / 5.0
-    start_x = gap
-    btn_rely = 0.74
-    btn_height = 0.052
+    mouth_mask_var = ctk.BooleanVar(value=modules.globals.mouth_mask)
+    mouth_mask_switch = ctk.CTkSwitch(
+        root,
+        text=_("Mouth Mask"),
+        variable=mouth_mask_var,
+        cursor="hand2",
+        command=lambda: setattr(modules.globals, "mouth_mask", mouth_mask_var.get()),
+    )
+    mouth_mask_switch.place(relx=0.1, rely=0.55)
+
+    show_mouth_mask_box_var = ctk.BooleanVar(value=modules.globals.show_mouth_mask_box)
+    show_mouth_mask_box_switch = ctk.CTkSwitch(
+        root,
+        text=_("Show Mouth Mask Box"),
+        variable=show_mouth_mask_box_var,
+        cursor="hand2",
+        command=lambda: setattr(
+            modules.globals, "show_mouth_mask_box", show_mouth_mask_box_var.get()
+        ),
+    )
+    show_mouth_mask_box_switch.place(relx=0.6, rely=0.55)
 
     start_button = ctk.CTkButton(
-        root,
-        text=_("Start"),
-        cursor="hand2",
-        command=lambda: analyze_target(start, root),
-        height=48,
+        root, text=_("Start"), cursor="hand2", command=lambda: analyze_target(start, root)
     )
-    start_button.place(
-        relx=start_x, rely=btn_rely, relwidth=btn_w, relheight=btn_height
-    )
+    start_button.place(relx=0.15, rely=0.80, relwidth=0.2, relheight=0.05)
 
     stop_button = ctk.CTkButton(
-        root,
-        text=_("Quit"),
-        cursor="hand2",
-        command=lambda: destroy(),
-        height=48,
-        fg_color=["#FF3B30", "#FF453A"],
-        hover_color=["#D70015", "#FF6961"],
+        root, text=_("Destroy"), cursor="hand2", command=lambda: destroy()
     )
-    stop_button.place(
-        relx=start_x + (btn_w + gap) * 1,
-        rely=btn_rely,
-        relwidth=btn_w,
-        relheight=btn_height,
-    )
+    stop_button.place(relx=0.4, rely=0.80, relwidth=0.2, relheight=0.05)
 
     preview_button = ctk.CTkButton(
-        root,
-        text=_("Preview"),
-        cursor="hand2",
-        command=lambda: toggle_preview(),
-        height=48,
-        fg_color=["#5856D6", "#5E5CE6"],
-        hover_color=["#4240A8", "#7A78F0"],
+        root, text=_("Preview"), cursor="hand2", command=lambda: toggle_preview()
     )
-    preview_button.place(
-        relx=start_x + (btn_w + gap) * 2,
-        rely=btn_rely,
-        relwidth=btn_w,
-        relheight=btn_height,
-    )
+    preview_button.place(relx=0.65, rely=0.80, relwidth=0.2, relheight=0.05)
+
+    # --- Camera Selection ---
+    camera_label = ctk.CTkLabel(root, text=_("Select Camera:"))
+    camera_label.place(relx=0.1, rely=0.86, relwidth=0.2, relheight=0.05)
+
+    available_cameras = get_available_cameras()
+    camera_indices, camera_names = available_cameras
+
+    if not camera_names or camera_names[0] == "No cameras found":
+        camera_variable = ctk.StringVar(value="No cameras found")
+        camera_optionmenu = ctk.CTkOptionMenu(
+            root,
+            variable=camera_variable,
+            values=["No cameras found"],
+            state="disabled",
+        )
+    else:
+        camera_variable = ctk.StringVar(value=camera_names[0])
+        camera_optionmenu = ctk.CTkOptionMenu(
+            root, variable=camera_variable, values=camera_names
+        )
+
+    camera_optionmenu.place(relx=0.35, rely=0.86, relwidth=0.25, relheight=0.05)
 
     live_button = ctk.CTkButton(
         root,
-        text=_("Live ▾"),
+        text=_("Live"),
         cursor="hand2",
-        command=lambda: open_camera_menu(root),
-        height=48,
-        fg_color=["#34C759", "#30D158"],
-        hover_color=["#248A3D", "#4DD964"],
+        command=lambda: webcam_preview(
+            root,
+            (
+                camera_indices[camera_names.index(camera_variable.get())]
+                if camera_names and camera_names[0] != "No cameras found"
+                else None
+            ),
+        ),
+        state=(
+            "normal"
+            if camera_names and camera_names[0] != "No cameras found"
+            else "disabled"
+        ),
     )
-    live_button.place(
-        relx=start_x + (btn_w + gap) * 3,
-        rely=btn_rely,
-        relwidth=btn_w,
-        relheight=btn_height,
-    )
-    globals().setdefault("live_button", live_button)
+    live_button.place(relx=0.65, rely=0.86, relwidth=0.2, relheight=0.05)
+    # --- End Camera Selection ---
 
-    # Camera selection is lazy (opens on Live press). This keeps the main UI clean.
-
-    # --- Progress Section (Liquid Glass: distinct functional layer) ---
-    progress_frame = ctk.CTkFrame(
-        root, corner_radius=16, fg_color=["#F2F2F7", "#1C1C1E"]
-    )
-    progress_frame.place(relx=0.04, rely=0.81, relwidth=0.92, relheight=0.10)
-
-    stage_label = ctk.CTkLabel(
-        progress_frame, text="", justify="center", font=ctk.CTkFont(size=12)
-    )
-    stage_label.place(relx=0.02, rely=0.15, relwidth=0.96)
-
-    progress_bar = ctk.CTkProgressBar(progress_frame, height=6)
-    progress_bar.place(relx=0.04, rely=0.55, relwidth=0.70)
-    progress_bar.set(0)
-
-    progress_label = ctk.CTkLabel(
-        progress_frame, text="", justify="right", font=ctk.CTkFont(size=12)
-    )
-    progress_label.place(relx=0.76, rely=0.45, relwidth=0.20)
-
-    # Store references globally
-    globals()["progress_bar"] = progress_bar
-    globals()["progress_label"] = progress_label
-    globals()["stage_label"] = stage_label
-    # --- End Progress Section ---
-
-    # --- Footer Section ---
-    status_label = ctk.CTkLabel(
-        root,
-        text=None,
-        justify="center",
-        font=ctk.CTkFont(size=12),
-        text_color=["#8E8E93", "#8E8E93"],
-    )
-    status_label.place(relx=0.04, rely=0.92, relwidth=0.92)
+    status_label = ctk.CTkLabel(root, text=None, justify="center")
+    status_label.place(relx=0.1, rely=0.9, relwidth=0.8)
 
     donate_label = ctk.CTkLabel(
-        root,
-        text="Deep Live Cam",
-        justify="center",
-        cursor="hand2",
-        font=ctk.CTkFont(size=12, weight="bold"),
+        root, text="Deep Live Cam", justify="center", cursor="hand2"
     )
-    donate_label.place(relx=0.04, rely=0.96, relwidth=0.92)
+    donate_label.place(relx=0.1, rely=0.95, relwidth=0.8)
     donate_label.configure(
         text_color=ctk.ThemeManager.theme.get("URL").get("text_color")
     )
@@ -462,7 +380,6 @@ def create_root(start: Callable[[], None], destroy: Callable[[], None]) -> ctk.C
     )
 
     return root
-
 
 def close_mapper_window():
     global POPUP, POPUP_LIVE
@@ -498,13 +415,12 @@ def analyze_target(start: Callable[[], None], root: ctk.CTk):
 
 
 def create_source_target_popup(
-    start: Callable[[], None], root: ctk.CTk, map: list
+        start: Callable[[], None], root: ctk.CTk, map: list
 ) -> None:
-    """Liquid Glass styled popup for face mapping."""
     global POPUP, popup_status_label
 
     POPUP = ctk.CTkToplevel(root)
-    POPUP.title(_("Source × Target Mapper"))
+    POPUP.title(_("Source x Target Mapper"))
     POPUP.geometry(f"{POPUP_WIDTH}x{POPUP_HEIGHT}")
     POPUP.focus()
 
@@ -513,23 +429,12 @@ def create_source_target_popup(
             POPUP.destroy()
             select_output_path(start)
         else:
-            update_pop_status("At least 1 source with target is required!")
-
-    # Header with title-style capitalization
-    header_label = ctk.CTkLabel(
-        POPUP,
-        text=_("Map Source Faces to Targets"),
-        font=ctk.CTkFont(size=16, weight="bold"),
-    )
-    header_label.grid(row=0, column=0, padx=20, pady=(20, 12), sticky="w")
+            update_pop_status("Atleast 1 source with target is required!")
 
     scrollable_frame = ctk.CTkScrollableFrame(
-        POPUP,
-        width=POPUP_SCROLL_WIDTH,
-        height=POPUP_SCROLL_HEIGHT,
-        corner_radius=20,
+        POPUP, width=POPUP_SCROLL_WIDTH, height=POPUP_SCROLL_HEIGHT
     )
-    scrollable_frame.grid(row=1, column=0, padx=16, pady=8, sticky="nsew")
+    scrollable_frame.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
 
     def on_button_click(map, button_num):
         map = update_popup_source(scrollable_frame, map, button_num)
@@ -579,7 +484,7 @@ def create_source_target_popup(
 
 
 def update_popup_source(
-    scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
+        scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
 ) -> list:
     global source_label_dict
 
@@ -604,7 +509,7 @@ def update_popup_source(
             x_min, y_min, x_max, y_max = face["bbox"]
 
             map[button_num]["source"] = {
-                "cv2": cv2_img[int(y_min) : int(y_max), int(x_min) : int(x_max)],
+                "cv2": cv2_img[int(y_min): int(y_max), int(x_min): int(x_max)],
                 "face": face,
             }
 
@@ -653,65 +558,6 @@ def create_preview(parent: ctk.CTkToplevel) -> ctk.CTkToplevel:
 def update_status(text: str) -> None:
     status_label.configure(text=_(text))
     ROOT.update()
-
-
-def update_progress(current: int, total: int, stage: str = None) -> None:
-    """Update the visual progress bar and optional stage indicator.
-
-    Args:
-        current: Current progress value
-        total: Total value (for percentage calculation)
-        stage: Optional stage name (e.g., "Extracting", "Processing", "Encoding")
-    """
-    global progress_bar, progress_label, stage_label
-
-    if progress_bar is None:
-        return
-
-    try:
-        if total > 0:
-            progress = current / total
-            progress_bar.set(progress)
-            percentage = int(progress * 100)
-            progress_label.configure(text=f"{current}/{total} ({percentage}%)")
-        else:
-            progress_bar.set(0)
-            progress_label.configure(text="")
-
-        if stage is not None and stage_label is not None:
-            # Stage indicator with visual markers
-            stages = ["Extracting", "Processing", "Enhancing", "Encoding"]
-            stage_text = ""
-            for s in stages:
-                if s.lower() in stage.lower():
-                    stage_text += f"● {s}  "
-                elif stages.index(s) < next(
-                    (stages.index(x) for x in stages if x.lower() in stage.lower()), 0
-                ):
-                    stage_text += f"✓ {s}  "
-                else:
-                    stage_text += f"○ {s}  "
-            stage_label.configure(text=stage_text.strip())
-
-        ROOT.update_idletasks()
-    except Exception:
-        pass  # Ignore errors if UI not ready
-
-
-def reset_progress() -> None:
-    """Reset progress bar to initial state."""
-    global progress_bar, progress_label, stage_label
-
-    try:
-        if progress_bar is not None:
-            progress_bar.set(0)
-        if progress_label is not None:
-            progress_label.configure(text="")
-        if stage_label is not None:
-            stage_label.configure(text="")
-        ROOT.update_idletasks()
-    except Exception:
-        pass
 
 
 def update_pop_status(text: str) -> None:
@@ -859,7 +705,7 @@ def fit_image_to_size(image, width: int, height: int):
     ratio_h = height / h
     # Use the smaller ratio to ensure the image fits within the given dimensions
     ratio = min(ratio_w, ratio_h)
-
+    
     # Compute new dimensions, ensuring they're at least 1 pixel
     new_width = max(1, int(ratio * w))
     new_height = max(1, int(ratio * h))
@@ -876,7 +722,7 @@ def render_image_preview(image_path: str, size: Tuple[int, int]) -> ctk.CTkImage
 
 
 def render_video_preview(
-    video_path: str, size: Tuple[int, int], frame_number: int = 0
+        video_path: str, size: Tuple[int, int], frame_number: int = 0
 ) -> ctk.CTkImage:
     capture = cv2.VideoCapture(video_path)
     if frame_number:
@@ -916,7 +762,7 @@ def update_preview(frame_number: int = 0) -> None:
         if modules.globals.nsfw_filter and check_and_ignore_nsfw(temp_frame):
             return
         for frame_processor in get_frame_processors_modules(
-            modules.globals.frame_processors
+                modules.globals.frame_processors
         ):
             temp_frame = frame_processor.process_frame(
                 get_one_face(cv2.imread(modules.globals.source_path)), temp_frame
@@ -949,6 +795,7 @@ def webcam_preview(root: ctk.CTk, camera_index: int):
         create_source_target_popup_for_webcam(
             root, modules.globals.source_target_map, camera_index
         )
+
 
 
 def get_available_cameras():
@@ -992,33 +839,22 @@ def get_available_cameras():
         camera_names = []
 
         if platform.system() == "Darwin":  # macOS specific handling
-            # Avoid opening the FaceTime camera at startup (turns on LED / sensor).
-            # Use a non-invasive system query to detect camera presence and defer
-            # opening the device until the user presses the Live button.
-            try:
-                import subprocess, json
-
-                sp = subprocess.run(
-                    ["system_profiler", "SPCameraDataType", "-json"],
-                    capture_output=True,
-                    text=True,
-                    timeout=1,
-                )
-                if sp.returncode == 0 and sp.stdout:
-                    info = json.loads(sp.stdout)
-                    cam_info = info.get("SPCameraDataType", [])
-                    if cam_info:
-                        # Map detected cameras to indices (we don't probe indices here)
-                        for idx, cam in enumerate(cam_info):
-                            camera_indices.append(idx)
-                            camera_names.append(cam.get("_name", f"Camera {idx}"))
-            except Exception:
-                # Fall back to a conservative non-opening assumption: expose the
-                # default FaceTime Camera entry (will be opened only on Live).
+            # Try to open the default FaceTime camera first
+            cap = cv2.VideoCapture(0)
+            if cap.isOpened():
                 camera_indices.append(0)
                 camera_names.append("FaceTime Camera")
+                cap.release()
+
+            # On macOS, additional cameras typically use indices 1 and 2
+            for i in [1, 2]:
+                cap = cv2.VideoCapture(i)
+                if cap.isOpened():
+                    camera_indices.append(i)
+                    camera_names.append(f"Camera {i}")
+                    cap.release()
         else:
-            # Linux / other Unix-like: test first 10 indices (no macOS here)
+            # Linux camera detection - test first 10 indices
             for i in range(10):
                 cap = cv2.VideoCapture(i)
                 if cap.isOpened():
@@ -1030,99 +866,6 @@ def get_available_cameras():
             return [], ["No cameras found"]
 
         return camera_indices, camera_names
-
-
-def open_camera_menu(root: ctk.CTk) -> None:
-    """Lazy camera selector shown when the Live button is pressed.
-
-    - If zero cameras: show status message.
-    - If one camera: start preview immediately.
-    - If multiple: show a small popup with camera choices.
-
-    Follows Liquid Glass design: rounded corners, proper spacing, visual hierarchy.
-    """
-    camera_indices, camera_names = get_available_cameras()
-
-    # No cameras
-    if not camera_names or camera_names[0] == "No cameras found":
-        update_status("No cameras found")
-        return
-
-    # Single camera -> start immediately
-    if len(camera_indices) == 1:
-        webcam_preview(root, camera_indices[0])
-        return
-
-    # Multiple cameras -> present a Liquid Glass styled chooser
-    chooser = ctk.CTkToplevel(root)
-    chooser.title(_("Select Camera"))
-    chooser.transient(root)
-    chooser.grab_set()
-
-    # Compute size and center over parent
-    max_height = 340
-    item_h = 52
-    desired_h = min(max_height, 100 + item_h * len(camera_names))
-    desired_w = 400
-    try:
-        root.update_idletasks()
-        root_x = root.winfo_rootx()
-        root_y = root.winfo_rooty()
-        root_w = root.winfo_width() or 800
-        root_h = root.winfo_height() or 600
-        x = int(root_x + (root_w - desired_w) / 2)
-        y = int(root_y + (root_h - desired_h) / 2)
-        chooser.geometry(f"{desired_w}x{desired_h}+{x}+{y}")
-    except Exception:
-        chooser.geometry(f"{desired_w}x{desired_h}")
-
-    # Header with title-style capitalization (Liquid Glass guideline)
-    lbl = ctk.CTkLabel(
-        chooser,
-        text=_("Choose Camera"),
-        font=ctk.CTkFont(size=16, weight="bold"),
-    )
-    lbl.pack(padx=16, pady=(20, 12))
-
-    list_h = desired_h - 140
-    scroll_frame = ctk.CTkScrollableFrame(
-        chooser,
-        width=desired_w - 32,
-        height=list_h,
-        corner_radius=16,
-    )
-    scroll_frame.pack(padx=16, pady=(0, 12), fill="both", expand=False)
-
-    for idx, name in zip(camera_indices, camera_names):
-
-        def _on_click(i=idx):
-            try:
-                chooser.grab_release()
-            except Exception:
-                pass
-            chooser.destroy()
-            webcam_preview(root, i)
-
-        btn = ctk.CTkButton(
-            scroll_frame,
-            text=name,
-            command=_on_click,
-            height=44,
-            fg_color=["#34C759", "#30D158"],
-            hover_color=["#248A3D", "#4DD964"],
-        )
-        btn.pack(fill="x", padx=8, pady=6)
-
-    cancel = ctk.CTkButton(
-        chooser,
-        text=_("Cancel"),
-        command=lambda: (chooser.grab_release(), chooser.destroy()),
-        height=44,
-        fg_color="transparent",
-        text_color=["#007AFF", "#0A84FF"],
-        hover_color=["#E5E5EA", "#39393D"],
-    )
-    cancel.pack(pady=(4, 16))
 
 
 def create_webcam_preview(camera_index: int):
@@ -1218,7 +961,7 @@ def create_webcam_preview(camera_index: int):
 
 
 def create_source_target_popup_for_webcam(
-    root: ctk.CTk, map: list, camera_index: int
+        root: ctk.CTk, map: list, camera_index: int
 ) -> None:
     global POPUP_LIVE, popup_status_label_live
 
@@ -1248,20 +991,17 @@ def create_source_target_popup_for_webcam(
     popup_status_label_live = ctk.CTkLabel(POPUP_LIVE, text=None, justify="center")
     popup_status_label_live.grid(row=1, column=0, pady=15)
 
-    add_button = ctk.CTkButton(
-        POPUP_LIVE, text=_("Add"), command=lambda: on_add_click()
-    )
+    add_button = ctk.CTkButton(POPUP_LIVE, text=_("Add"), command=lambda: on_add_click())
     add_button.place(relx=0.1, rely=0.92, relwidth=0.2, relheight=0.05)
 
-    clear_button = ctk.CTkButton(
-        POPUP_LIVE, text=_("Clear"), command=lambda: on_clear_click()
-    )
+    clear_button = ctk.CTkButton(POPUP_LIVE, text=_("Clear"), command=lambda: on_clear_click())
     clear_button.place(relx=0.4, rely=0.92, relwidth=0.2, relheight=0.05)
 
     close_button = ctk.CTkButton(
         POPUP_LIVE, text=_("Submit"), command=lambda: on_submit_click()
     )
     close_button.place(relx=0.7, rely=0.92, relwidth=0.2, relheight=0.05)
+
 
 
 def clear_source_target_images(map: list):
@@ -1363,7 +1103,7 @@ def refresh_data(map: list):
 
 
 def update_webcam_source(
-    scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
+        scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
 ) -> list:
     global source_label_dict_live
 
@@ -1388,7 +1128,7 @@ def update_webcam_source(
             x_min, y_min, x_max, y_max = face["bbox"]
 
             map[button_num]["source"] = {
-                "cv2": cv2_img[int(y_min) : int(y_max), int(x_min) : int(x_max)],
+                "cv2": cv2_img[int(y_min): int(y_max), int(x_min): int(x_max)],
                 "face": face,
             }
 
@@ -1415,7 +1155,7 @@ def update_webcam_source(
 
 
 def update_webcam_target(
-    scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
+        scrollable_frame: ctk.CTkScrollableFrame, map: list, button_num: int
 ) -> list:
     global target_label_dict_live
 
@@ -1440,7 +1180,7 @@ def update_webcam_target(
             x_min, y_min, x_max, y_max = face["bbox"]
 
             map[button_num]["target"] = {
-                "cv2": cv2_img[int(y_min) : int(y_max), int(x_min) : int(x_max)],
+                "cv2": cv2_img[int(y_min): int(y_max), int(x_min): int(x_max)],
                 "face": face,
             }
 
